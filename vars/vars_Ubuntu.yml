@@ -1,0 +1,3 @@
+---
+home_dir: /home/ubuntu
+golang_dir: "{{ home_dir }}/go"
