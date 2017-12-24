@@ -2,3 +2,4 @@
 lightning_user: ubuntu
 home_dir: "/home/{{ lightning_user }}"
 golang_dir: "{{ home_dir }}/go"
+golang_ver: "1.9"

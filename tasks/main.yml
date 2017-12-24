@@ -28,23 +28,25 @@
     name: "{{ item }}"
     state: present
   with_items:
-    - golang-go
-    - golang-glide
+    - "golang-{{ golang_ver }}-go"
+#    - golang-glide # Once we move away from 16.04, change glide to golang-glide here
+    - glide
     - nodejs
     - git
     - supervisor
 
-#- name: link go
-#      become: true
-#      file:
-#        src: "/usr/lib/go-1.8/bin/{{ item }}"
-#        dest: "/usr/local/bin/{{ item }}"
-#        state: link
-#      with_items:
-#        - go
-#        - gofmt
-#      tags:
-#        - go
+- name: link go
+  file:
+    src: "/usr/lib/go-{{ golang_ver }}/bin/{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    state: link
+  with_items:
+    - go
+    - gofmt
+
+- name: Set GOPATH for all users
+  copy: src=go-path.sh
+        dest=/etc/profile.d
 
 - name: "Ensure golang dir is present"
   become: true
@@ -78,12 +80,14 @@
   become_method: su
   shell: >
       cd {{ golang_dir }}/src/github.com/{{ item }} && \
-      {{ golang_dir }}/bin/glide install && \
+      glide install && \
       go install . ./cmd/...
   with_items:
     - "btcsuite/btcd"
     - "btcsuite/btcwallet"
     - "lightningnetwork/lnd"
+  environment:
+    GOPATH: "{{ golang_dir }}"
 
 - name: Clone sources from github
   become: true
@@ -92,8 +96,8 @@
   git: repo="https://github.com/mably/lncli-web.git" dest="{{ home_dir }}/lncli-web" force=yes
 
 - name: reboot to reflect all changes
-  command: /sbin/shutdown -r now
-    async: 0
-    poll: 0
-    ignore_errors: true
+  command: "/sbin/shutdown -r now"
+  async: 0
+  poll: 0
+  ignore_errors: true
 
