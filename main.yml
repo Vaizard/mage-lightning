@@ -1,0 +1,99 @@
+---
+
+- name: "Include distro-specific variables"
+  include_vars: "vars_{{ ansible_distribution }}.yml"
+
+- name: Add nodesource apt_keys
+  apt_key:
+    url: "https://deb.nodesource.com/gpgkey/nodesource.gpg.key"
+    state: present
+
+- name: "Ensure apt repositry for nodejs is added"
+  apt_repository:
+    repo: "deb https://deb.nodesource.com/node_7.x {{ ansible_distribution_release }} main" 
+    state: present
+#  shell: curl -sL https://deb.nodesource.com/setup_6.x | sudo -E bash -
+#    args:
+#      creates: "/usr/bin/node"
+
+- name: "Ensure apt repositry for go is added"
+  apt_repository: repo='ppa:gophers/archive' state=present
+
+# Glide ppa required for ubuntu =< 16.04, newer ubuntu releases have the package
+- name: "Ensure apt repositry for go is added"
+  apt_repository: repo='ppa:masterminds/glide' state=present
+
+- name: "Ensure dependencies are installed"
+  apt:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - golang-go
+    - golang-glide
+    - nodejs
+    - git
+    - supervisor
+
+#- name: link go
+#      become: true
+#      file:
+#        src: "/usr/lib/go-1.8/bin/{{ item }}"
+#        dest: "/usr/local/bin/{{ item }}"
+#        state: link
+#      with_items:
+#        - go
+#        - gofmt
+#      tags:
+#        - go
+
+- name: "Ensure golang dir is present"
+  become: true
+  become_user: "{{ lightning_user }}"
+  become_method: su
+  file: path="{{ golang_dir }}" state=directory
+
+- name: "Security upgrades"
+  command: unattended-upgrades
+
+#- name: "Ensure glide is installed"
+#  become: true
+#  become_user: "{{ lightning_user }}"
+#  become_method: su
+#  shell: go get -u github.com/Masterminds/glide
+
+
+- name: Clone sources from github
+  become: true
+  become_user: "{{ lightning_user }}"
+  become_method: su
+  git: repo="https://github.com/{{ item }}.git" dest="{{ golang_dir }}/src/github.com/{{ item }}" force=yes
+  with_items:
+    - "btcsuite/btcd"
+    - "btcsuite/btcwallet"
+    - "lightningnetwork/lnd"
+
+- name: install node/wallet/lnd
+  become: true
+  become_user: "{{ lightning_user }}"
+  become_method: su
+  shell: >
+      cd {{ golang_dir }}/src/github.com/{{ item }} && \
+      {{ golang_dir }}/bin/glide install && \
+      go install . ./cmd/...
+  with_items:
+    - "btcsuite/btcd"
+    - "btcsuite/btcwallet"
+    - "lightningnetwork/lnd"
+
+- name: Clone sources from github
+  become: true
+  become_user: "{{ lightning_user }}"
+  become_method: su
+  git: repo="https://github.com/mably/lncli-web.git" dest="{{ home_dir }}/lncli-web" force=yes
+
+- name: reboot to reflect all changes
+  command: /sbin/shutdown -r now
+    async: 0
+    poll: 0
+    ignore_errors: true
+
